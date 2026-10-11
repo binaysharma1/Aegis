@@ -74,7 +74,7 @@ tests/
 
 ## Roadmap
 
-- [ ] **Phase 0 — Skeleton**: config loader, `VideoSource`, CLI, debug overlay
+- [x] **Phase 0 — Skeleton**: config loader, `VideoSource`, CLI, debug overlay
 - [ ] **Phase 1 — Perception core**: detector, traffic-light classifier, tracker, zones
 - [ ] **Phase 2 — Rule engine (v0)**: signal timeline + red-light-running + evidence
 - [ ] **Phase 3 — Serving (v1)**: event store, FastAPI, minimal dashboard
@@ -91,11 +91,18 @@ Requires Python 3.12+ and [`uv`](https://github.com/astral-sh/uv).
 git clone <your-repo-url> aegis
 cd aegis
 
-# sync dependencies (once they exist)
+# sync dependencies
 uv sync
 
-# run the CLI (currently just a placeholder)
-uv run aegis
+# sanity check
+uv run aegis hello
+
+# validate the example site config
+uv run aegis config --path configs/cameras/example.yaml
+
+# open a video source with a debug overlay (file / webcam index / RTSP)
+uv run aegis run --source 0 --show
+uv run aegis run --source data/clip.mp4 --show
 ```
 
 ## Privacy & legal note

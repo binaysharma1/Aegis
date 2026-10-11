@@ -1,0 +1,14 @@
+# Example site config — copy and edit per intersection.
+# Stop lines / polygons / light boxes will live here in Phase 1+.
+name: demo-crossing
+cameras:
+  - id: cam-north
+    source: "0" # webcam index, file path (data/clip.mp4), or rtsp://...
+    fps: 30.0
+    width: 1280
+    height: 720
+  - id: cam-file
+    source: data/clip.mp4
+    fps: 25.0
+    width: 1920
+    height: 1080

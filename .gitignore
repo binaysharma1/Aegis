@@ -8,3 +8,17 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Local data / evidence (never commit clips or plates)
+data/
+evidence/
+*.mp4
+*.avi
+*.mkv
+*.sqlite3
+*.db
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

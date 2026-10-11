@@ -1,16 +1,37 @@
 [project]
 name = "aegis"
 version = "0.1.0"
-description = "Add your description here"
+description = "Edge-AI computer vision for traffic intersections (perception + violation rules)"
 readme = "README.md"
 authors = [
     { name = "binaysharma1", email = "binaysharma0064@gmail.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python>=4.9",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+]
 
 [project.scripts]
-aegis = "aegis:main"
+aegis = "aegis.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+ignore = ["PYI034"]
 
 [build-system]
 requires = ["uv_build>=0.12.10,<0.13.0"]
