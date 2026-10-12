@@ -103,6 +103,10 @@ uv run aegis config --path configs/cameras/example.yaml
 # open a video source with a debug overlay (file / webcam index / RTSP)
 uv run aegis run --source 0 --show
 uv run aegis run --source data/clip.mp4 --show
+
+# run the tiny events API (in-memory, Phase 3 preview)
+uv run aegis serve
+# -> http://127.0.0.1:8000/docs
 ```
 
 ## Privacy & legal note

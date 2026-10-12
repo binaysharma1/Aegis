@@ -59,6 +59,11 @@ def build_parser() -> argparse.ArgumentParser:
     cfg.add_argument("--path", required=True, help="Path to site YAML file.")
     cfg.set_defaults(func=cmd_config)
 
+    serve = sub.add_parser("serve", help="Run the tiny FastAPI backend.")
+    serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1).")
+    serve.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000).")
+    serve.set_defaults(func=cmd_serve)
+
     return parser
 
 
@@ -116,6 +121,14 @@ def cmd_config(args: argparse.Namespace) -> int:
     print(f"OK: site '{site.name}' with {len(site.cameras)} camera(s):")
     for cam in site.cameras:
         print(f"  - {cam.id}: source={cam.source} fps={cam.fps} size={cam.width}x{cam.height}")
+    return 0
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    print(f"Serving Aegis API on http://{args.host}:{args.port} (Ctrl-C to stop)")
+    uvicorn.run("aegis.api:app", host=args.host, port=args.port)
     return 0
 
 
