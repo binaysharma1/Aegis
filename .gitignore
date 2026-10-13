@@ -18,6 +18,10 @@ evidence/
 *.sqlite3
 *.db
 
+# Downloaded model weights (re-downloaded automatically)
+*.pt
+*.onnx
+
 # Editors / OS
 .vscode/
 .idea/

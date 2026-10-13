@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections import Counter
 
 import cv2
 
 from aegis.config import load_site_config
+from aegis.perception import Detector, draw_detections
 from aegis.video import VideoSource
 
 
@@ -53,6 +55,39 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional site YAML to validate before running.",
     )
+    run.add_argument(
+        "--model",
+        default="yolov8n.pt",
+        help="YOLO weights to detect with (COCO-pretrained, default: yolov8n.pt).",
+    )
+    run.add_argument(
+        "--conf",
+        type=float,
+        default=0.4,
+        help="Keep detections at/above this confidence 0-1 (default: 0.4).",
+    )
+    run.add_argument(
+        "--imgsz",
+        type=int,
+        default=640,
+        help="Model input size in px; smaller = faster (default: 640).",
+    )
+    run.add_argument(
+        "--every",
+        type=int,
+        default=1,
+        help="Run detection every Nth frame; others reuse last boxes (default: 1).",
+    )
+    run.add_argument(
+        "--no-detect",
+        action="store_true",
+        help="Skip detection entirely (video overlay only).",
+    )
+    run.add_argument(
+        "--save-frame",
+        default=None,
+        help="Save the last annotated frame to this image path.",
+    )
     run.set_defaults(func=cmd_run)
 
     cfg = sub.add_parser("config", help="Validate a site/camera YAML config.")
@@ -85,14 +120,29 @@ def cmd_run(args: argparse.Namespace) -> int:
         site = load_site_config(args.config)
         print(f"Loaded site '{site.name}' with {len(site.cameras)} camera(s).")
 
+    detector: Detector | None = None
+    if not args.no_detect:
+        print(f"Loading detection model '{args.model}' (first run downloads ~6MB)...")
+        detector = Detector(model=args.model, conf=args.conf, imgsz=args.imgsz)
+        print(f"Model ready — {len(detector.names)} COCO classes.")
+
     source = _coerce_source(args.source)
     frames = 0
+    detections: list = []
+    last = None  # last annotated frame, for --save-frame
     try:
         with VideoSource(source) as vs:
             print(f"Opened {vs.describe()} — press 'q' to quit.")
             for frame_no, _t, frame in vs.frames():
                 frames += 1
-                overlay = vs.overlay(frame, frame_no)
+                if detector is not None and frame_no % args.every == 0:
+                    detections = detector.detect(frame)
+                annotated = draw_detections(frame, detections) if detector is not None else frame
+                overlay = vs.overlay(annotated, frame_no)
+                last = overlay
+                if detector is not None and frames % 30 == 0:
+                    counts = Counter(d.label for d in detections)
+                    print(f"frame {frame_no}: {dict(counts) or 'nothing'}")
                 if args.show:
                     cv2.imshow("aegis — debug (q to quit)", overlay)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -109,6 +159,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             cv2.destroyAllWindows()
 
     print(f"Done — processed {frames} frame(s).")
+    if args.save_frame and last is not None:
+        cv2.imwrite(args.save_frame, last)
+        print(f"Saved annotated frame -> {args.save_frame}")
     return 0
 
 

@@ -104,6 +104,10 @@ uv run aegis config --path configs/cameras/example.yaml
 uv run aegis run --source 0 --show
 uv run aegis run --source data/clip.mp4 --show
 
+# detect objects (YOLO nano, COCO classes) with boxes + labels
+uv run aegis run --source data/clip.mp4 --show --conf 0.4
+uv run aegis run --source photo.jpg --max-frames 1 --save-frame /tmp/annotated.jpg
+
 # run the tiny events API (in-memory, Phase 3 preview)
 uv run aegis serve
 # -> http://127.0.0.1:8000/docs

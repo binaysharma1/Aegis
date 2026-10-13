@@ -14,6 +14,7 @@ dependencies = [
     "opencv-python>=4.9",
     "pydantic>=2.7",
     "pyyaml>=6.0",
+    "ultralytics>=8.4.176",
     "uvicorn>=0.30",
 ]
 
@@ -39,3 +40,10 @@ ignore = ["PYI034"]
 [build-system]
 requires = ["uv_build>=0.12.10,<0.13.0"]
 build-backend = "uv_build"
+
+# Extra index for CPU-only PyTorch wheels (no GPU here).
+# uv merges indexes and `2.14.1+cpu` sorts higher than PyPI's `2.14.1`,
+# so torch/torchvision resolve to the small CPU builds (~200MB, no nvidia blobs).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
