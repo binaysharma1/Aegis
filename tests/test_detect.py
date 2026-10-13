@@ -39,3 +39,25 @@ def test_cli_detect_flags_defaults():
     assert args.conf == 0.4
     assert args.every == 1
     assert args.no_detect is False
+    assert args.track is False
+
+
+def test_cli_track_flag_parses():
+    args = build_parser().parse_args(["run", "--track"])
+    assert args.track is True
+
+
+def test_detection_defaults_to_untracked():
+    assert _det().track_id is None
+
+
+def test_track_colors_follow_id_not_class():
+    assert color_for(3) != color_for(4)  # distinct IDs, distinct colors
+    assert color_for(3) == color_for(3)  # same ID, stable color
+
+
+def test_draw_tracked_keeps_shape():
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    out = draw_detections(frame, [_det(track_id=7), _det(track_id=3)])
+    assert out.shape == frame.shape
+    assert out[10, 10].tolist() != [0, 0, 0]

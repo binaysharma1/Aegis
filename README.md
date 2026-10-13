@@ -108,6 +108,9 @@ uv run aegis run --source data/clip.mp4 --show
 uv run aegis run --source data/clip.mp4 --show --conf 0.4
 uv run aegis run --source photo.jpg --max-frames 1 --save-frame /tmp/annotated.jpg
 
+# track objects with stable IDs across frames (fixes flicker)
+uv run aegis run --source 0 --show --track --conf 0.3
+
 # run the tiny events API (in-memory, Phase 3 preview)
 uv run aegis serve
 # -> http://127.0.0.1:8000/docs

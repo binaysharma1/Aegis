@@ -84,6 +84,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip detection entirely (video overlay only).",
     )
     run.add_argument(
+        "--track",
+        action="store_true",
+        help="Track objects with stable IDs across frames (ByteTrack).",
+    )
+    run.add_argument(
         "--save-frame",
         default=None,
         help="Save the last annotated frame to this image path.",
@@ -115,6 +120,16 @@ def _coerce_source(raw: str) -> int | str:
     return int(raw) if raw.isdigit() else raw
 
 
+def _describe(detections: list, tracked: bool) -> str:
+    """One-line summary for the periodic frame log."""
+    if not detections:
+        return "nothing"
+    if tracked:
+        ids = sorted({(d.label, d.track_id) for d in detections if d.track_id is not None})
+        return ", ".join(f"{label}#{tid}" for label, tid in ids) or "untracked"
+    return str(dict(Counter(d.label for d in detections)))
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     if args.config:
         site = load_site_config(args.config)
@@ -136,13 +151,15 @@ def cmd_run(args: argparse.Namespace) -> int:
             for frame_no, _t, frame in vs.frames():
                 frames += 1
                 if detector is not None and frame_no % args.every == 0:
-                    detections = detector.detect(frame)
+                    if args.track:
+                        detections = detector.track(frame)
+                    else:
+                        detections = detector.detect(frame)
                 annotated = draw_detections(frame, detections) if detector is not None else frame
                 overlay = vs.overlay(annotated, frame_no)
                 last = overlay
                 if detector is not None and frames % 30 == 0:
-                    counts = Counter(d.label for d in detections)
-                    print(f"frame {frame_no}: {dict(counts) or 'nothing'}")
+                    print(f"frame {frame_no}: {_describe(detections, args.track)}")
                 if args.show:
                     cv2.imshow("aegis — debug (q to quit)", overlay)
                     if cv2.waitKey(1) & 0xFF == ord("q"):

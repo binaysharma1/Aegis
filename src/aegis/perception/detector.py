@@ -23,6 +23,7 @@ class Detection:
     label: str
     confidence: float
     cls: int = 0
+    track_id: int | None = None  # stable number across frames (None = untracked)
 
     @property
     def bbox(self) -> tuple[int, int, int, int]:
@@ -53,5 +54,26 @@ class Detector:
             cls = int(box.cls[0])
             out.append(
                 Detection(x1, y1, x2, y2, self.model.names[cls], float(box.conf[0]), cls)
+            )
+        return out
+
+    def track(self, frame: np.ndarray) -> list[Detection]:
+        """Like detect(), but each box carries a stable track_id across frames.
+
+        Uses ByteTrack (built into Ultralytics). `persist=True` keeps the
+        tracker's memory between calls, so id #3 in this frame is the same
+        object as id #3 in the last frame — as long as this Detector instance
+        lives (one run = one instance = one consistent numbering).
+        """
+        results = self.model.track(
+            frame, persist=True, conf=self.conf, imgsz=self.imgsz, verbose=False
+        )
+        out: list[Detection] = []
+        for box in results[0].boxes:
+            x1, y1, x2, y2 = (int(v) for v in box.xyxy[0].tolist())
+            cls = int(box.cls[0])
+            tid = int(box.id[0]) if box.id is not None else None
+            out.append(
+                Detection(x1, y1, x2, y2, self.model.names[cls], float(box.conf[0]), cls, tid)
             )
         return out

@@ -28,12 +28,19 @@ def color_for(cls: int) -> tuple[int, int, int]:
 
 
 def draw_detections(frame: np.ndarray, detections: list[Detection]) -> np.ndarray:
-    """Return a copy of frame with one rectangle + `label conf` per detection."""
+    """Return a copy of frame with one rectangle + caption per detection.
+
+    Caption is `label conf`, or `label #id conf` when tracked. Color follows
+    the track id when present (so one object keeps its color), else the class.
+    """
     out = frame.copy()
     for det in detections:
-        color = color_for(det.cls)
+        key = det.track_id if det.track_id is not None else det.cls
+        color = color_for(key)
         cv2.rectangle(out, (det.x1, det.y1), (det.x2, det.y2), color, 2)
         caption = f"{det.label} {det.confidence:.2f}"
+        if det.track_id is not None:
+            caption = f"{det.label} #{det.track_id} {det.confidence:.2f}"
         y = det.y1 - 8 if det.y1 - 8 > 8 else det.y1 + 18  # keep text on-screen
         cv2.putText(
             out, caption, (det.x1, y),
