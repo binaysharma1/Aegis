@@ -20,7 +20,10 @@ import cv2
 
 from aegis.config import load_site_config
 from aegis.perception import Detector, draw_detections
+from aegis.perception.draw import draw_line, draw_signal
+from aegis.rules import SimSignal
 from aegis.video import VideoSource
+from aegis.zones import Line, LineWatcher
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -89,6 +92,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Track objects with stable IDs across frames (ByteTrack).",
     )
     run.add_argument(
+        "--line",
+        default=None,
+        help="Virtual line: 'x1,y1,x2,y2' in pixels, 'middle' for the frame's "
+        "horizontal mid-line, or 'vmiddle' for the vertical mid-line. "
+        "Needs --track. Crossings are reported.",
+    )
+    run.add_argument(
+        "--signal",
+        action="store_true",
+        help="Show a simulated traffic light (RED->GREEN->ORANGE). "
+        "Crossing on RED counts as a violation.",
+    )
+    run.add_argument(
+        "--classes",
+        default=None,
+        help="Only these labels count, e.g. 'person' or 'person,car'. "
+        "Default: every class counts.",
+    )
+    run.add_argument(
+        "--cycle",
+        type=float,
+        default=5.0,
+        help="Seconds per light state for --signal (default: 5).",
+    )
+    run.add_argument(
         "--save-frame",
         default=None,
         help="Save the last annotated frame to this image path.",
@@ -120,6 +148,14 @@ def _coerce_source(raw: str) -> int | str:
     return int(raw) if raw.isdigit() else raw
 
 
+def _parse_classes(raw: str | None) -> set[str] | None:
+    """'person' -> {'person'}; None/'' -> None (every class counts)."""
+    if raw is None:
+        return None
+    wants = {c.strip().lower() for c in raw.split(",") if c.strip()}
+    return wants or None
+
+
 def _describe(detections: list, tracked: bool) -> str:
     """One-line summary for the periodic frame log."""
     if not detections:
@@ -141,9 +177,31 @@ def cmd_run(args: argparse.Namespace) -> int:
         detector = Detector(model=args.model, conf=args.conf, imgsz=args.imgsz)
         print(f"Model ready — {len(detector.names)} COCO classes.")
 
+    pending_line = args.line
+    if pending_line is not None:
+        if not args.track:
+            print("error: --line needs --track (crossings need stable IDs)", file=sys.stderr)
+            return 1
+        if not Line.is_keyword(pending_line):
+            try:
+                Line.parse(pending_line)  # fail fast on bad format, before opening video
+            except ValueError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 1
+
+    wanted = _parse_classes(args.classes)
+
+    try:
+        signal = SimSignal(cycle=args.cycle) if args.signal else None
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
     source = _coerce_source(args.source)
     frames = 0
     detections: list = []
+    crossings: list[dict] = []  # every crossing, as plain dicts
+    watcher: LineWatcher | None = None
     last = None  # last annotated frame, for --save-frame
     try:
         with VideoSource(source) as vs:
@@ -155,8 +213,45 @@ def cmd_run(args: argparse.Namespace) -> int:
                         detections = detector.track(frame)
                     else:
                         detections = detector.detect(frame)
+                if pending_line is not None and watcher is None:
+                    # resolved on the first frame: keywords need the real size
+                    h, w = frame.shape[:2]
+                    try:
+                        line = Line.from_spec(pending_line, w, h)
+                    except ValueError as exc:
+                        print(f"error: {exc}", file=sys.stderr)
+                        return 1
+                    watcher = LineWatcher(line)
+                    print(f"Watching line ({line.x1},{line.y1})-({line.x2},{line.y2})")
+                light = signal.state_now() if signal is not None else "OFF"
+                if watcher is not None:
+                    for d in detections:
+                        if d.track_id is None:
+                            continue
+                        if wanted is not None and d.label.lower() not in wanted:
+                            continue  # e.g. bus/car boxes ignored with --classes person
+                        cross = watcher.update(
+                            d.track_id, d.label,
+                            (d.x1 + d.x2) / 2, (d.y1 + d.y2) / 2,
+                        )
+                        if cross is not None:
+                            rec = {
+                                "id": cross.track_id,
+                                "class": cross.label,
+                                "direction": cross.direction,
+                                "frame": frame_no,
+                                "signal": light,
+                                "violation": light == "RED",
+                            }
+                            crossings.append(rec)
+                            tag = "VIOLATION" if rec["violation"] else "CROSSED"
+                            print(f"{tag} {rec}")
                 annotated = draw_detections(frame, detections) if detector is not None else frame
+                if watcher is not None:
+                    annotated = draw_line(annotated, watcher.line)
                 overlay = vs.overlay(annotated, frame_no)
+                if signal is not None:
+                    overlay = draw_signal(overlay, light)
                 last = overlay
                 if detector is not None and frames % 30 == 0:
                     print(f"frame {frame_no}: {_describe(detections, args.track)}")
@@ -176,6 +271,13 @@ def cmd_run(args: argparse.Namespace) -> int:
             cv2.destroyAllWindows()
 
     print(f"Done — processed {frames} frame(s).")
+    print(f"Crossings: {len(crossings)}")
+    for rec in crossings:
+        print(f"  {rec}")
+    violations = [rec for rec in crossings if rec["violation"]]
+    print(f"Violations (crossed on RED): {len(violations)}")
+    for rec in violations:
+        print(f"  {rec}")
     if args.save_frame and last is not None:
         cv2.imwrite(args.save_frame, last)
         print(f"Saved annotated frame -> {args.save_frame}")

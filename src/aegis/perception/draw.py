@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 from aegis.perception.detector import Detection
+from aegis.zones.geometry import Line
 
 # BGR colors, one per class id (wraps around), so cars look ≠ people.
 PALETTE: list[tuple[int, int, int]] = [
@@ -46,4 +47,28 @@ def draw_detections(frame: np.ndarray, detections: list[Detection]) -> np.ndarra
             out, caption, (det.x1, y),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA,
         )
+    return out
+
+
+def draw_line(frame: np.ndarray, line: Line) -> np.ndarray:
+    """Draw the virtual line in red, with dots on its endpoints."""
+    out = frame.copy()
+    cv2.line(out, (line.x1, line.y1), (line.x2, line.y2), (0, 0, 255), 2)
+    for pt in ((line.x1, line.y1), (line.x2, line.y2)):
+        cv2.circle(out, pt, 4, (0, 0, 255), -1)
+    return out
+
+
+def draw_signal(frame: np.ndarray, state: str) -> np.ndarray:
+    """Traffic-light widget, top-right: 3 lamps, the active one lit."""
+    out = frame.copy()
+    lamps = (("RED", (0, 0, 255)), ("GREEN", (0, 255, 0)), ("ORANGE", (0, 165, 255)))
+    x0 = out.shape[1] - 70
+    cv2.rectangle(out, (x0 - 8, 8), (x0 + 32, 108), (20, 20, 20), -1)
+    for i, (name, color) in enumerate(lamps):
+        cv2.circle(out, (x0 + 12, 28 + i * 30), 10, color if name == state else (60, 60, 60), -1)
+    cv2.putText(
+        out, state, (x0 - 8, 124),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA,
+    )
     return out

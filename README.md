@@ -111,6 +111,11 @@ uv run aegis run --source photo.jpg --max-frames 1 --save-frame /tmp/annotated.j
 # track objects with stable IDs across frames (fixes flicker)
 uv run aegis run --source 0 --show --track --conf 0.3
 
+# virtual stop-line + simulated traffic light (crossing on RED = violation)
+# 'middle' = horizontal mid-line, 'vmiddle' = vertical (for side-to-side walkers)
+uv run aegis run --source 0 --show --track --line vmiddle --classes person --signal
+uv run aegis run --source 0 --show --track --line 0,400,1280,400 --signal --cycle 5
+
 # run the tiny events API (in-memory, Phase 3 preview)
 uv run aegis serve
 # -> http://127.0.0.1:8000/docs
